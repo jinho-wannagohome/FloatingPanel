@@ -582,9 +582,9 @@ open class FloatingPanelController: UIViewController {
     ///     - to: Pass a FloatingPanelPosition value to move the surface view to the position.
     ///     - animated: Pass true to animate the presentation; otherwise, pass false.
     ///     - completion: The block to execute after the view controller has finished moving. This block has no return value and takes no parameters. You may specify nil for this parameter.
-    @objc(moveToState:animated:completion:)
-    public func move(to: FloatingPanelState, animated: Bool, completion: (() -> Void)? = nil) {
-        floatingPanel.move(to: to, animated: animated, completion: completion)
+    @objc(moveToState:animated:notifyStateChange:completion:)
+    public func move(to: FloatingPanelState, animated: Bool, notifyStateChange: Bool = true, completion: (() -> Void)? = nil) {
+        floatingPanel.move(to: to, animated: animated, notifyStateChange: notifyStateChange, completion: completion)
     }
 
     /// Sets the view controller responsible for the content portion of a panel.

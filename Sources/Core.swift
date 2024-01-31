@@ -37,9 +37,6 @@ class Core: NSObject, UIGestureRecognizerDelegate {
     private(set) var state: FloatingPanelState = .hidden {
         didSet {
             os_log(msg, log: devLog, type: .debug, "state changed: \(oldValue) -> \(state)")
-            if let fpc = ownerVC {
-                fpc.delegate?.floatingPanelDidChangeState?(fpc)
-            }
         }
     }
 
@@ -110,11 +107,11 @@ class Core: NSObject, UIGestureRecognizerDelegate {
         self.moveAnimator?.stopAnimation(false)
     }
 
-    func move(to: FloatingPanelState, animated: Bool, completion: (() -> Void)? = nil) {
-        move(from: state, to: to, animated: animated, completion: completion)
+    func move(to: FloatingPanelState, animated: Bool, notifyStateChange: Bool = true, completion: (() -> Void)? = nil) {
+        move(from: state, to: to, animated: animated, notifyStateChange: notifyStateChange, completion: completion)
     }
 
-    private func move(from: FloatingPanelState, to: FloatingPanelState, animated: Bool, completion: (() -> Void)? = nil) {
+    private func move(from: FloatingPanelState, to: FloatingPanelState, animated: Bool, notifyStateChange: Bool, completion: (() -> Void)? = nil) {
         assert(layoutAdapter.validStates.contains(to), "Can't move to '\(to)' state because it's not valid in the layout")
         guard let vc = ownerVC else {
             completion?()
@@ -145,7 +142,7 @@ class Core: NSObject, UIGestureRecognizerDelegate {
                 let animationVector = CGVector(dx: abs(removalVector.dx), dy: abs(removalVector.dy))
                 animator = vc.animatorForDismissing(with: animationVector)
             default:
-                startAttraction(to: to, with: .zero) { [weak self] in
+                    startAttraction(to: to, with: .zero, notifyStateChange: notifyStateChange) { [weak self] in
                     self?.endAttraction(false)
                     updateScrollView()
                     completion?()
@@ -161,6 +158,9 @@ class Core: NSObject, UIGestureRecognizerDelegate {
                 guard let self = self else { return }
 
                 self.state = to
+                if notifyStateChange {
+                    self.notifyStateChange()
+                }
                 self.updateLayout(to: to)
 
                 if shouldDoubleLayout {
@@ -183,6 +183,9 @@ class Core: NSObject, UIGestureRecognizerDelegate {
             animator.startAnimation()
         } else {
             self.state = to
+            if notifyStateChange {
+                self.notifyStateChange()
+            }
             self.updateLayout(to: to)
             if isScrollable(state: state) {
                 self.unlockScrollView()
@@ -192,6 +195,12 @@ class Core: NSObject, UIGestureRecognizerDelegate {
             }
             ownerVC?.notifyDidMove()
             completion?()
+        }
+    }
+
+    private func notifyStateChange() {
+        if let fpc = ownerVC {
+            fpc.delegate?.floatingPanelDidChangeState?(fpc)
         }
     }
 
@@ -543,7 +552,7 @@ class Core: NSObject, UIGestureRecognizerDelegate {
                                                                   scrollingContent: true,
                                                                   allowsRubberBanding: behaviorAdapter.allowsRubberBanding(for:))
                 }
-                panningEnd(with: translation, velocity: velocity)
+                panningEnd(with: translation, velocity: velocity, notifyStateChange: true)
             default:
                 break
             }
@@ -695,7 +704,7 @@ class Core: NSObject, UIGestureRecognizerDelegate {
         return false
     }
 
-    private func panningEnd(with translation: CGPoint, velocity: CGPoint) {
+    private func panningEnd(with translation: CGPoint, velocity: CGPoint, notifyStateChange: Bool) {
         os_log(msg, log: devLog, type: .debug, "panningEnd -- translation = \(value(of: translation)), velocity = \(value(of: velocity))")
 
         if state == .hidden {
@@ -742,7 +751,7 @@ class Core: NSObject, UIGestureRecognizerDelegate {
             vc.delegate?.floatingPanelDidEndDragging?(vc, willAttract: true)
         }
 
-        startAttraction(to: target, with: velocity) { [weak self] in
+        startAttraction(to: target, with: velocity, notifyStateChange: notifyStateChange) { [weak self] in
             self?.endAttraction(true)
         }
     }
@@ -877,16 +886,16 @@ class Core: NSObject, UIGestureRecognizerDelegate {
         return true
     }
 
-    private func startAttraction(to state: FloatingPanelState, with velocity: CGPoint, completion: @escaping (() -> Void)) {
+    private func startAttraction(to state: FloatingPanelState, with velocity: CGPoint, notifyStateChange: Bool, completion: @escaping (() -> Void)) {
         os_log(msg, log: devLog, type: .debug, "startAnimation to \(state) -- velocity = \(value(of: velocity))")
         guard let vc = ownerVC else { return }
 
         isAttracting = true
         vc.delegate?.floatingPanelWillBeginAttracting?(vc, to: state)
-        move(to: state, with: value(of: velocity), completion: completion)
+        move(to: state, with: value(of: velocity), notifyStateChange: notifyStateChange, completion: completion)
     }
 
-    private func move(to state: FloatingPanelState, with velocity: CGFloat, completion: @escaping (() -> Void)) {
+    private func move(to state: FloatingPanelState, with velocity: CGFloat, notifyStateChange: Bool, completion: @escaping (() -> Void)) {
         let (animationConstraint, target) = layoutAdapter.setUpAttraction(to: state)
         let initialData = NumericSpringAnimator.Data(value: animationConstraint.constant, velocity: velocity)
         moveAnimator = NumericSpringAnimator(
@@ -925,6 +934,9 @@ class Core: NSObject, UIGestureRecognizerDelegate {
         })
         moveAnimator?.startAnimation()
         self.state = state
+        if notifyStateChange {
+            self.notifyStateChange()
+        }
     }
 
     private func endAttraction(_ tryUnlockScroll: Bool) {
