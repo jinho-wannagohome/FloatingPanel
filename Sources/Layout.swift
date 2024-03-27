@@ -17,6 +17,8 @@ import os.log
     /// Returns layout constraints to determine the cross dimension of a panel.
     @objc optional func prepareLayout(surfaceView: UIView, in view: UIView) -> [NSLayoutConstraint]
 
+    @objc optional func prepareLayout(backDropView: BackdropView, in view: UIView) -> [NSLayoutConstraint]
+
     /// Returns the alpha value of the backdrop of a panel for each state.
     @objc optional func backdropAlpha(for state: FloatingPanelState) -> CGFloat
 }
@@ -445,12 +447,17 @@ class LayoutAdapter {
                 ]
             }
         }
-        let backdropConstraints = [
-            backdropView.topAnchor.constraint(equalTo: vc.view.topAnchor, constant: 0.0),
-            backdropView.leftAnchor.constraint(equalTo: vc.view.leftAnchor,constant: 0.0),
-            backdropView.rightAnchor.constraint(equalTo: vc.view.rightAnchor, constant: 0.0),
-            backdropView.bottomAnchor.constraint(equalTo: vc.view.bottomAnchor, constant: 0.0),
+        let backdropConstraints: [NSLayoutConstraint]
+        if let constraints = layout.prepareLayout?(backDropView: backdropView, in: vc.view) {
+            backdropConstraints = constraints
+        } else {
+            backdropConstraints = [
+                backdropView.topAnchor.constraint(equalTo: vc.view.topAnchor, constant: 0.0),
+                backdropView.leftAnchor.constraint(equalTo: vc.view.leftAnchor,constant: 0.0),
+                backdropView.rightAnchor.constraint(equalTo: vc.view.rightAnchor, constant: 0.0),
+                backdropView.bottomAnchor.constraint(equalTo: vc.view.bottomAnchor, constant: 0.0),
             ]
+        }
 
         fixedConstraints = surfaceConstraints + backdropConstraints
 
